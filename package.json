@@ -1,0 +1,49 @@
+{
+  "name": "laserbat-spidermonkey-converter",
+  "version": "0.0.1",
+  "description": "convert ASTs between LaserBat and SpiderMonkey formats",
+  "author": "Shape Security Labs",
+  "homepage": "https://github.com/shapesecurity/laserbat-spidermonkey-converter-js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shapesecurity/laserbat-spidermonkey-converter-js.git"
+  },
+  "main": "lib/index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "mocha --compilers js:6to5/lib/6to5/register --check-leaks --inline-diffs --ui tdd --reporter dot test",
+    "build": "mkdir lib; 6to5 --source-maps-inline --out-dir lib src"
+  },
+  "dependencies": {
+    "laserbat-ast": "0.x.x"
+  },
+  "devDependencies": {
+    "6to5": "^1.14.14",
+    "esprima": "^1.2.2",
+    "mocha": "^2.0.1"
+  },
+  "keywords": [
+    "LaserBat",
+    "AST",
+    "node",
+    "converter",
+    "SpiderMonkey",
+    "Parser",
+    "API",
+    "convert",
+    "between",
+    "laser",
+    "bat",
+    "spider",
+    "monkey",
+    "abstract",
+    "syntax",
+    "tree"
+  ],
+  "bugs": {
+    "url": "https://github.com/shapesecurity/laserbat-spidermonkey-converter-js/issues"
+  },
+  "license": "Apache-2.0"
+}
