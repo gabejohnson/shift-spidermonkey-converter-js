@@ -82,11 +82,27 @@ function convertExpressionStatement(node) {
 }
 
 function convertForStatement(node) {
-  return new LaserBat.ForStatement(convert(node.init), convert(node.test), convert(node.update), convert(node.body));
+  var init = null;
+  if (node.init != null) {
+    if (node.init.type === 'VariableDeclaration') {
+      init = convertVariableDeclaration(node.init);
+    } else {
+      init = convert(node.init);
+    }
+  }
+  return new LaserBat.ForStatement(init, convert(node.test), convert(node.update), convert(node.body));
 }
 
 function convertForInStatement(node) {
-  return new LaserBat.ForInStatement(convert(node.left), convert(node.right), convert(node.body));
+  var left = null;
+  if (node.left != null) {
+    if (node.left.type === 'VariableDeclaration') {
+      left = convertVariableDeclaration(node.left);
+    } else {
+      left = convert(node.left);
+    }
+  }
+  return new LaserBat.ForInStatement(left, convert(node.right), convert(node.body));
 }
 
 function convertFunctionDeclaration(node) {
@@ -250,6 +266,10 @@ function convertVariableDeclaration(node) {
   return new LaserBat.VariableDeclaration(node.kind, node.declarations.map(convertVariableDeclarator));
 }
 
+function convertVariableDeclarationStatement(node) {
+  return new LaserBat.VariableDeclarationStatement(convertVariableDeclaration(node));
+}
+
 function convertVariableDeclarator(node) {
   return new LaserBat.VariableDeclarator(convertIdentifier(node.id), convert(node.init));
 }
@@ -299,7 +319,7 @@ const Convert = {
   TryStatement: convertTryStatement,
   UnaryExpression: convertUnaryExpression,
   UpdateExpression: convertUpdateExpression,
-  VariableDeclaration: convertVariableDeclaration,
+  VariableDeclaration: convertVariableDeclarationStatement,
   VariableDeclarator: convertVariableDeclarator,
   WhileStatement: convertWhileStatement,
   WithStatement: convertWithStatement

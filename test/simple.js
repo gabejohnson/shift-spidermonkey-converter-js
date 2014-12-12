@@ -14,10 +14,19 @@
  * limitations under the License.
  */
 
-import * as assert from "assert";
+import * as
+assert
+from
+"assert";
 
-import * as esprima from "esprima";
-import * as converters from "..";
+import * as
+esprima
+from
+"esprima";
+import * as
+converters
+from
+"..";
 
 suite("API", () => {
   test("ToSpiderMonkey should exist", () => {
@@ -41,7 +50,7 @@ suite("General", function () {
   }
 
   function roundTrip(type, source) {
-    test(type, function() {
+    test(type, function () {
       var smAst = esprima.parse(source);
       assert.notEqual(null, smAst);
       stripRaw(smAst);
@@ -50,6 +59,35 @@ suite("General", function () {
       assert.deepEqual(smAst2, smAst);
     });
   }
+
+  suite("fixture", () => {
+    assert.deepEqual(JSON.parse(JSON.stringify(converters.toLaserBat(esprima.parse(`var a`)))), JSON.parse(JSON.stringify({
+      "type": "Script",
+      "body": {
+        "type": "FunctionBody",
+        "directives": [],
+        "statements": [
+          {
+            "type": "VariableDeclarationStatement",
+            "declaration": {
+              "type": "VariableDeclaration",
+              "kind": "var",
+              "declarators": [
+                {
+                  "type": "VariableDeclarator",
+                  "binding": {
+                    "type": "Identifier",
+                    "name": "a"
+                  },
+                  "init": null
+                }
+              ]
+            }
+          }
+        ]
+      }
+    })));
+  });
 
   suite("round-tripping", () => {
     roundTrip("Script", ``);
