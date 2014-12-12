@@ -9,9 +9,9 @@
     "url": "https://github.com/shapesecurity/laserbat-spidermonkey-converter-js.git"
   },
   "main": "lib/index.js",
-  "directories": {
-    "test": "test"
-  },
+  "files": [
+    "lib"
+  ],
   "scripts": {
     "test": "mocha --compilers js:6to5/lib/6to5/register --check-leaks --inline-diffs --ui tdd --reporter dot test",
     "build": "mkdir lib; 6to5 --source-maps-inline --out-dir lib src"
