@@ -12,7 +12,7 @@ AST format.
 
 ## Status
 
-This project is currently in the `0.x.x` series until the `laserbat-ast` dependency is brought out of the `0.x.x` series.
+[Stable](http://nodejs.org/api/documentation.html#documentation_stability_index).
 
 
 ## Installation
@@ -35,7 +35,7 @@ convert.toLaserBat(/* a SpiderMonkey format AST */)
 ## Contributing
 
 * Open a Github issue with a description of your desired change. If one exists already, leave a message stating that you are working on it with the date you expect it to be complete.
-* Fork and clone the forked repo.
+* Fork this repo, and clone the forked repo.
 * Install dependencies with `npm install`.
 * Build and test in your environment with `npm run build && npm test`.
 * Create a feature branch. Make your changes. Add tests.
