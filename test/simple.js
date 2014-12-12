@@ -61,7 +61,12 @@ suite("General", function () {
   }
 
   suite("fixture", () => {
-    assert.deepEqual(JSON.parse(JSON.stringify(converters.toLaserBat(esprima.parse(`var a`)))), JSON.parse(JSON.stringify({
+    function test(source, tree) {
+      // console.log(JSON.stringify(converters.toLaserBat(esprima.parse(source)), null, 2));
+      assert.deepEqual(JSON.parse(JSON.stringify(converters.toLaserBat(esprima.parse(source)))), JSON.parse(JSON.stringify(tree)));
+    }
+
+    test(`var a`, {
       "type": "Script",
       "body": {
         "type": "FunctionBody",
@@ -86,7 +91,38 @@ suite("General", function () {
           }
         ]
       }
-    })));
+    });
+
+    test(`a:do continue a; while(1);`, {
+      "type": "Script",
+      "body": {
+        "type": "FunctionBody",
+        "directives": [],
+        "statements": [
+          {
+            "type": "LabeledStatement",
+            "label": {
+              "type": "Identifier",
+              "name": "a"
+            },
+            "body": {
+              "type": "DoWhileStatement",
+              "body": {
+                "type": "ContinueStatement",
+                "label": {
+                  "type": "Identifier",
+                  "name": "a"
+                }
+              },
+              "test": {
+                "type": "LiteralNumericExpression",
+                "value": 1
+              }
+            }
+          }
+        ]
+      }
+    });
   });
 
   suite("round-tripping", () => {

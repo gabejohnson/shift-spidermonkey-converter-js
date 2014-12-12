@@ -62,7 +62,7 @@ function convertConditionalExpression(node) {
 }
 
 function convertContinueStatement(node) {
-  return new LaserBat.ContinueStatement(convert(node.label));
+  return new LaserBat.ContinueStatement(convertIdentifier(node.label));
 }
 
 function convertDebuggerStatement() {
