@@ -1,6 +1,6 @@
 {
   "name": "laserbat-spidermonkey-converter",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "convert ASTs between LaserBat and SpiderMonkey formats",
   "author": "Shape Security Labs",
   "homepage": "https://github.com/shapesecurity/laserbat-spidermonkey-converter-js",
