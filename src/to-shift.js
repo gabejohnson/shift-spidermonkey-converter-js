@@ -16,12 +16,14 @@
 
 import * as Shift from "shift-ast";
 
-// convert SpiderMonkey AST format to Shift AST format
+// convert Babylon AST format to Shift AST format
 
 export default function convert(node) {
   if (node == null) {
     return null;
   }
+
+  if(!Convert[node.type]) throw Error(`Unrecognized type: ${node.type}`);
 
   return Convert[node.type](node);
 }
@@ -30,7 +32,7 @@ function toBinding(node) {
   if(node == null) return null;
   switch(node.type) {
     case "Identifier": return new Shift.BindingIdentifier({ name: node.name });
-    case "Property": if(node.shorthand) {
+    case "ObjectProperty": if(node.shorthand) {
       return new Shift.BindingPropertyIdentifier({
         binding: toBinding(node.key),
         init: toExpression(node.value.right)
@@ -84,6 +86,7 @@ function toExpression(node) {
     case "Identifier": return new Shift.IdentifierExpression({ name: node.name });
     case "MetaProperty": return new Shift.NewTargetExpression();
     case "TemplateLiteral": return convertTemplateLiteral(node);
+    case "ObjectMethod": return convertObjectMethod(node);
     default: return convert(node);
   }
 }
@@ -174,12 +177,19 @@ function convertForOfStatement(node) {
   });
 }
 
+function toFunctionBody(node) {
+  return new Shift.FunctionBody({
+    directives: node.directives.map(convertDirective),
+    statements: node.body.map(convert)
+  });
+}
+
 function convertFunctionDeclaration(node) {
   return new Shift.FunctionDeclaration({
     isGenerator: node.generator,
     name: toBinding(node.id),
     params: new Shift.FormalParameters(convertFunctionParams(node)),
-    body: convertStatementsToFunctionBody(node.body.body)
+    body: toFunctionBody(node.body)
   });
 }
 
@@ -188,7 +198,7 @@ function convertFunctionExpression(node) {
     isGenerator: node.generator,
     name: toBinding(node.id),
     params: new Shift.FormalParameters(convertFunctionParams(node)),
-    body: convertStatementsToFunctionBody(node.body.body)
+    body: toFunctionBody(node.body)
   });
 }
 
@@ -226,6 +236,26 @@ function convertLiteral(node) {
   }
 }
 
+function convertBooleanLiteral(node) {
+  return new Shift.LiteralBooleanExpression(node);
+}
+
+function convertNumericLiteral(node) {
+  return new Shift.LiteralNumericExpression(node);
+}
+
+function convertStringLiteral(node) {
+  return new Shift.LiteralStringExpression(node);
+}
+
+function convertRegExpLiteral(node) {
+  return new Shift.LiteralRegExpExpression(node);
+}
+
+function convertNullLiteral(node) {
+  return new Shift.LiteralNullExpression();
+}
+
 function convertMemberExpression(node) {
   let obj = node.object.type === "Super" ?
       convertSuper(node.object) :
@@ -252,25 +282,11 @@ function convertNewExpression(node) {
 }
 
 function convertObjectExpression(node) {
-  return new Shift.ObjectExpression({ properties: node.properties.map(convert) });
+  return new Shift.ObjectExpression({ properties: node.properties.map(toExpression) });
 }
 
 function convertDirective(node) {
-  node = node.expression;
-  var value = node.value;
-  return new Shift.Directive({rawValue: value});
-}
-
-function convertStatementsToFunctionBody(stmts) {
-  for (var i = 0; i < stmts.length; i++) {
-    if (!(stmts[i].type === "ExpressionStatement" && stmts[i].expression.type === "Literal" && typeof stmts[i].expression.value === "string")) {
-      break;
-    }
-  }
-  return new Shift.FunctionBody({
-    directives: stmts.slice(0, i).map(convertDirective),
-    statements: stmts.slice(i).map(convert)
-  });
+  return new Shift.Directive({rawValue: node.value.value});
 }
 
 function convertProgram(node) {
@@ -293,7 +309,7 @@ function toPropertyName(node, computed) {
   }
 }
 
-function toInitProperty(node) {
+function convertObjectProperty(node) {
   let name = toPropertyName(node.key, node.computed);
   if(node.shorthand) {
     return new Shift.ShorthandProperty({ name: node.key.name });
@@ -303,39 +319,35 @@ function toInitProperty(node) {
 
 function toMethod(node) {
   return new Shift.Method({
-    isGenerator: node.value.generator,
+    isGenerator: node.generator,
     name: toPropertyName(node.key, node.computed),
-    body: convertStatementsToFunctionBody(node.value.body.body),
-    params: new Shift.FormalParameters(convertFunctionParams(node.value))
+    body: toFunctionBody(node.body),
+    params: new Shift.FormalParameters(convertFunctionParams(node))
   });
 }
 
 function toGetter(node) {
   return new Shift.Getter({
     name: toPropertyName(node.key, node.computed),
-    body: convertStatementsToFunctionBody(node.value.body.body)
+    body: toFunctionBody(node.body)
   });
 }
 
 function toSetter(node) {
-  let params = convertFunctionParams(node.value);
+  let params = convertFunctionParams(node);
   return new Shift.Setter({
     name: toPropertyName(node.key, node.computed),
-    body: convertStatementsToFunctionBody(node.value.body.body),
+    body: toFunctionBody(node.body),
     param: params.items[0] || params.rest
   });
 }
 
-function convertProperty(node) {
+function convertObjectMethod(node) {
   switch (node.kind) {
-    case "init": if(node.method) {
-      return toMethod(node);
-    } else {
-      return toInitProperty(node);
-    }
+    case "method": return toMethod(node);
     case "get": return toGetter(node);
     case "set": return toSetter(node);
-    default: throw Error(`Unknown kind of Property: ${node.kind}`);
+    default: throw Error(`Unknown kind of method: ${node.kind}`);
   }
 }
 
@@ -406,7 +418,7 @@ function convertTryStatement(node) {
     return new Shift.TryCatchStatement({
       body: convertBlock(node.block),
       catchClause: convertCatchClause(node.handler),
-      handlers: node.handlers.map(convert)
+      handlers: [convert(node.handler)]
     });
   }
 }
@@ -508,25 +520,16 @@ function convertArrayPattern(node) {
 function convertArrowFunctionExpression(node) {
   return new Shift.ArrowExpression({
     params: new Shift.FormalParameters(convertFunctionParams(node)),
-    body: node.expression ? convert(node.body) : convertStatementsToFunctionBody(node.body.body)
+    body: node.expression ? convert(node.body) : toFunctionBody(node.body)
   });
 }
 
 function convertFunctionParams(node) {
   let [items, rest] = convertElements(node.params);
-  if(node.defaults.length > 0) {
-    items = items.map((v,i) => {
-      let d = node.defaults[i];
-      if(d != null) {
-        return new Shift.BindingWithDefault({ binding: v, init: convert(d) });
-      }
-      return v;
-    });
-  }
   return { items, rest };
 }
 
-function convertMethodDefinition(node) {
+function convertClassMethod(node) {
   return new Shift.ClassElement({ isStatic: node.static, method: toMethod(node) });
 }
 
@@ -629,11 +632,18 @@ function convertImportNamespaceSpecifier(node) {
 }
 
 function convertImportSpecifier(node) {
-  return new Shift.ImportSpecifier({ name: node.imported.name, binding: toBinding(node.local) });
+  return new Shift.ImportSpecifier({
+    name: node.imported.name === node.local.name ? null : node.imported.name,
+    binding: toBinding(node.local)
+  });
 }
 
 function convertSpreadElement(node) {
   return new Shift.SpreadElement({ expression: toExpression(node.argument)});
+}
+
+function convertFile(node) {
+  return convert(node.program);
 }
 
 const Convert = {
@@ -650,6 +660,7 @@ const Convert = {
   ClassDeclaration: convertClassDeclaration,
   ClassExpression: convertClassExpression,
   ClassBody: convertClassBody,
+  ClassMethod: convertClassMethod,
   ConditionalExpression: convertConditionalExpression,
   ContinueStatement: convertContinueStatement,
   DoWhileStatement: convertDoWhileStatement,
@@ -660,6 +671,7 @@ const Convert = {
   ExportNamedDeclaration: convertExportNamedDeclaration,
   ExportSpecifier: convertExportSpecifier,
   ExpressionStatement: convertExpressionStatement,
+  File: convertFile,
   ForStatement: convertForStatement,
   ForOfStatement: convertForOfStatement,
   ForInStatement: convertForInStatement,
@@ -671,16 +683,20 @@ const Convert = {
   ImportNamespaceSpecifier: convertImportNamespaceSpecifier,
   ImportSpecifier: convertImportSpecifier,
   Literal: convertLiteral,
+  BooleanLiteral: convertBooleanLiteral,
+  NumericLiteral: convertNumericLiteral,
+  StringLiteral: convertStringLiteral,
+  RegExpLiteral: convertRegExpLiteral,
+  NullLiteral: convertNullLiteral,
   LabeledStatement: convertLabeledStatement,
   LogicalExpression: convertBinaryExpression,
   MemberExpression: convertMemberExpression,
   MetaProperty: convertMetaProperty,
-  MethodDefinition: convertMethodDefinition,
   NewExpression: convertNewExpression,
   ObjectExpression: convertObjectExpression,
   ObjectPattern: convertObjectPattern,
+  ObjectProperty: convertObjectProperty,
   Program: convertProgram,
-  Property: convertProperty,
   RestElement: convertRestElement,
   ReturnStatement: convertReturnStatement,
   SequenceExpression: convertSequenceExpression,

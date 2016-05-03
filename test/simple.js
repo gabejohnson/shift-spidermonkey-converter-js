@@ -16,7 +16,7 @@
 
 import * as assert from "assert";
 
-import * as esprima from "esprima";
+import * as babylon from "babylon";
 import * as shift from "shift-parser";
 import * as convert from "..";
 
@@ -31,11 +31,24 @@ suite("simple", function () {
         stripRaw(node[p]);
   }
 
+  function stripInfo(node) {
+    ['start', 'end', 'loc', 'tokens', 'comments', 'extra', '__clone'].forEach(p => {
+      if(node.hasOwnProperty(p)) {
+        delete node[p];
+      }
+    });
+
+    for (let p in node)
+      if(node[p] != null && typeof node[p] === "object")
+        stripInfo(node[p]);
+  }
+
   function roundTrip(type, source, isScript) {
     test(type, function() {
-      var smAst = esprima.parse(source, { sourceType: isScript ? "script" : "module" });
+      var smAst = babylon.parse(source, { sourceType: isScript ? "script" : "module" });
       assert.notEqual(null, smAst);
       stripRaw(smAst);
+      stripInfo(smAst);
       var lbAst = convert.toShift(smAst);
       var smAst2 = convert.toSpiderMonkey(lbAst);
       assert.deepEqual(smAst2, smAst);
@@ -43,6 +56,7 @@ suite("simple", function () {
       var shAst = (isScript ? shift.parseScript(source) : shift.parseModule(source));
       assert.notEqual(null, shAst);
       stripRaw(shAst);
+      stripInfo(shAst);
       var smAst3 = convert.toSpiderMonkey(shAst);
       var shAst2 = convert.toShift(smAst3);
       assert.deepEqual(shAst, shAst2);
@@ -138,8 +152,10 @@ suite("simple", function () {
     roundTrip("Module", `export function f(){};0`);
     roundTrip("Import", `import "a"`);
     roundTrip("ImportNamespace", `import a, * as b from "a"`);
-    roundTrip("ImportSpecifier", `import a, {b as c} from "a"`);
     roundTrip("ImportNamespace", `import * as _ from "a"`);
+    roundTrip("ImportSpecifier", `import a, {b as c} from "a"`);
+    roundTrip("ImportSpecifier", `import {b} from "a"`);
+    roundTrip("ImportSpecifier", `import {} from "a"`);
     roundTrip("Method", `({[6+3]() {}})`);
     roundTrip("Method", `({*"a"() {}})`);
     roundTrip("Getter", `({get 'b'() {}})`);

@@ -14,9 +14,7 @@
  * limitations under the License.
  */
 
-import {Identifier, LiteralStringExpression, LiteralNumericExpression} from "shift-ast";
-
-// convert Shift AST format to SpiderMonkey AST format
+// convert Shift AST format to Babylon AST format
 
 export default function convert(ast) {
   if (ast == null) {
@@ -29,28 +27,24 @@ export default function convert(ast) {
 function convertBindingWithDefault(node) {
   return {
     type: "AssignmentPattern",
-    operator: "=",
     left: convert(node.binding),
     right: convert(node.init)
   };
 }
 
 function convertFunctionBody(node) {
-  let directives = node.directives ? node.directives.map(convert) : [],
-      statements = node.statements ? node.statements.map(convert) : [];
   return {
     type: "BlockStatement",
-    body: directives.concat(statements)
+    directives: node.directives ? node.directives.map(convert) : [],
+    body: node.statements ? node.statements.map(convert) : []
   };
 }
 
 function convertFunctionDeclaration(node) {
-  let [params, defaults] = convertFormalParameters(node.params);
   return {
     type: "FunctionDeclaration",
     id: convert(node.name),
-    params,
-    defaults,
+    params: convertFormalParameters(node.params),
     body: convert(node.body),
     generator: node.isGenerator,
     expression: false
@@ -58,12 +52,10 @@ function convertFunctionDeclaration(node) {
 }
 
 function convertFunctionExpression(node) {
-  let [params, defaults] = convertFormalParameters(node.params);
   return {
     type: "FunctionExpression",
     id: convert(node.name),
-    params,
-    defaults,
+    params: convertFormalParameters(node.params),
     body: convert(node.body),
     generator: node.isGenerator,
     expression: false
@@ -79,18 +71,14 @@ function convertObjectExpression(node) {
 
 function convertGetter(node) {
   return {
-    type: "Property",
+    type: "ObjectMethod",
     key: convert(node.name),
     computed: false,
-    value: {
-      type: "FunctionExpression",
-      id: null,
-      params: [],
-      defaults: [],
-      body: convertFunctionBody(node.body),
-      generator: false,
-      expression: false
-    },
+    id: null,
+    params: [],
+    body: convertFunctionBody(node.body),
+    generator: false,
+    expression: false,
     method: false,
     shorthand: false,
     kind: "get"
@@ -98,32 +86,41 @@ function convertGetter(node) {
 }
 
 function convertSetter(node) {
-  let [params, defaults] = convertFormalParameters({items: [node.param]});//mocking a FormalParameters object
   return {
-    type: "Property",
+    type: "ObjectMethod",
     key: convert(node.name),
-    computed: false,
-    value: {
-      type: "FunctionExpression",
-      id: null,
-      params,
-      defaults,
-      body: convertFunctionBody(node.body),
-      generator: false,
-      expression: false
-    },
+    computed: node.name.type === "ComputedPropertyName",
+    id: null,
+    params: [convert(node.param)],
+    body: convertFunctionBody(node.body),
+    generator: false,
+    expression: false,
     method: false,
     shorthand: false,
     kind: "set"
   };
 }
+function convertMethod(node) {
+  return {
+    type: "ObjectMethod",
+    key: convert(node.name),
+    computed: node.name.type === "ComputedPropertyName",
+    kind: "method",
+    method: true,
+    shorthand: false,
+    id: null,
+    params: convertFormalParameters(node.params),
+    generator: node.isGenerator,
+    expression: false,
+    body: convertFunctionBody(node.body)
+  };
+}
 
 function convertDataProperty(node) {
   return {
-    type: "Property",
+    type: "ObjectProperty",
     key: convert(node.name),
     value: convert(node.expression),
-    kind: "init",
     computed: node.name.type === "ComputedPropertyName",
     method: false,
     shorthand: false
@@ -147,46 +144,43 @@ function convertPropertyName(node) {
 
 function convertLiteralBooleanExpression(node) {
   return {
-    type: "Literal",
-    value: node.value,
+    type: "BooleanLiteral",
+    value: node.value
   };
 }
 
 function convertLiteralNullExpression() {
   return {
-    type: "Literal",
-    value: null,
+    type: "NullLiteral"
   };
 }
 
 function convertLiteralNumericExpression(node) {
   return {
-    type: "Literal",
-    value: parseFloat(node.value),
+    type: "NumericLiteral",
+    value: parseFloat(node.value)
   };
 }
 
 function convertLiteralInfinityExpression(node) {
   return {
     type: "Literal",
-    value: 1 / 0,
+    value: 1 / 0
   };
 }
 
 function convertLiteralRegExpExpression(node) {
   return {
-    type: "Literal",
-    value: RegExp(node.pattern, node.flags),
-    regex: {
-      pattern: node.pattern,
-      flags: node.flags
-    }
+    type: "RegExpLiteral",
+    value: undefined,
+    pattern: node.pattern,
+    flags: node.flags
   };
 }
 
 function convertLiteralStringExpression(node) {
   return {
-    type: "Literal",
+    type: "StringLiteral",
     value: node.value
   };
 }
@@ -344,7 +338,6 @@ function convertForInStatement(node) {
     left: convert(node.left),
     right: convert(node.right),
     body: convert(node.body),
-    each: false
   };
 }
 
@@ -454,6 +447,7 @@ function convertWithStatement(node) {
 function convertBlock(node) {
   return {
     type: "BlockStatement",
+    directives: [],
     body: node.statements.map(convert)
   };
 }
@@ -466,43 +460,41 @@ function convertCatchClause(node) {
   };
 }
 
-function convertIdentifier(node) {
-  return createIdentifier(node.name);
-}
-
 function convertScript(node) {
-  let directives = node.directives.map(convert),
-      statements = node.statements.map(convert);
   return {
-    type: "Program",
-    body: directives.concat(statements),
-    sourceType: "script"
+    type: "File",
+    program: {
+      type: "Program",
+      directives: node.directives.map(convert),
+      body: node.statements.map(convert),
+      sourceType: "script"
+    }
   };
 }
 
 function convertModule(node) {
   return {
-    type: "Program",
-    body: node.items.map(convert),
-    sourceType: "module"
+    type: "File",
+    program: {
+      type: "Program",
+      directives: node.directives.map(convert),
+      body: node.items.map(convert),
+      sourceType: "module"
+    }
   };
 }
 
-function convertSwitchCase(node) {
+function toSwitchCase(convertCase, node) {
   return {
     type: "SwitchCase",
-    test: convert(node.test),
+    test: convertCase(node.test),
     consequent: node.consequent.map(convert)
   };
 }
 
-function convertSwitchDefault(node) {
-  return {
-    type: "SwitchCase",
-    test: null,
-    consequent: node.consequent.map(convert)
-  };
-}
+let convertSwitchCase = toSwitchCase.bind(null, convert);
+
+let convertSwitchDefault = toSwitchCase.bind(null, ()=>null);
 
 function convertVariableDeclaration(node) {
   return {
@@ -526,9 +518,9 @@ function convertBindingIdentifier(node) {
 
 function convertDirective(node) {
   return {
-    type: "ExpressionStatement",
-    expression: {
-      type: "Literal",
+    type: "Directive",
+    value: {
+      type: "DirectiveLiteral",
       value: node.rawValue
     }
   };
@@ -553,17 +545,16 @@ function convertUnaryExpression(node) {
 }
 
 function convertStaticPropertyName(node) {
-  return {
-    type: "Literal",
-    value: parseFloat(node.value) || node.value
-  };
+  let value = parseFloat(node.value) || node.value,
+      type = typeof value === "number" ? "NumericLiteral" : "StringLiteral";
+  return { type, value };
 }
 
 function convertNewTargetExpression(node) {
   return {
     type: "MetaProperty",
-    meta: "new",
-    property: "target"
+    meta: createIdentifier("new"),
+    property: createIdentifier("target")
   };
 }
 
@@ -585,8 +576,7 @@ function convertBindingPropertyIdentifier(node) {
         right: convert(node.init)
       };
   return {
-    type: "Property",
-    kind: "init",
+    type: "ObjectProperty",
     method: false,
     computed: false,
     shorthand: true,
@@ -623,12 +613,7 @@ function convertClassExpression(node) {
 function convertArrayBinding(node) {
   let elts = node.elements.map(v => {
     if(v.type === "BindingWithDefault") {
-      return {
-        type: "AssignmentPattern",
-        operator: "=",
-        left: convert(v.binding),
-        right: convert(v.init)
-      };
+      return convertBindingWithDefault(v);
     }
     return convert(v);
   });
@@ -641,8 +626,7 @@ function convertArrayBinding(node) {
 
 function convertBindingPropertyProperty(node) {
   return {
-    type: "Property",
-    kind: "init",
+    type: "ObjectProperty",
     computed: false,
     method: false,
     shorthand: false,
@@ -652,84 +636,40 @@ function convertBindingPropertyProperty(node) {
 }
 
 function convertArrowExpression(node)  {
-  let [params, defaults] = convertFormalParameters(node.params),
-      body = convert(node.body);
+  let body = convert(node.body);
   return {
     type: "ArrowFunctionExpression",
     id: null,
     generator: false,
     expression: body.type !== "BlockStatement",
-    params,
-    defaults,
+    params: convertFormalParameters(node.params),
     body: convert(node.body)
   };
 }
 
 function convertFormalParameters(ps) {
-  let params = [],
-      defaults = [];
+  let params = ps.items.map(convert);
   if(ps.items.length > 0) {
-    let hasDefaultBindings = false;
-    ps.items.forEach(function(v) {
-      if(v.type === "BindingWithDefault") {
-        hasDefaultBindings = true;
-        params.push(convert(v.binding));
-        defaults.push(convert(v.init));
-      } else {
-        params.push(convert(v));
-        defaults.push(null);
-      }
-    });
     if(ps.rest != null) {
       params.push({ type: "RestElement", argument: convert(ps.rest) });
-      defaults.push(null);
-    }
-    if(!hasDefaultBindings) {
-      defaults = [];
     }
   }
-  return [params, defaults];
-}
-
-function convertMethod(node) {
-  let [params, defaults] = convertFormalParameters(node.params);
-  return {
-    type: "Property",
-    key: convert(node.name),
-    computed: node.name.type === "ComputedPropertyName",
-    kind: "init",
-    method: true,
-    shorthand: false,
-    value: {
-      type: "FunctionExpression",
-      id: null,
-      params,
-      defaults,
-      generator: node.isGenerator,
-      expression: false,
-      body: convertFunctionBody(node.body)
-    }
-  };
+  return params;
 }
 
 function convertClassElement(node) {
-  let m = node.method,
-      [params, defaults] = convertFormalParameters(m.params);
+  let m = node.method;
   return {
-    type: "MethodDefinition",
+    type: "ClassMethod",
     key: convert(m.name),
     computed: m.name.type === "ComputedPropertyName",
     kind: m.name.value === "constructor" ? "constructor" : "init",
     static: node.isStatic,
-    value: {
-      type: "FunctionExpression",
-      id: null,
-      params,
-      defaults,
-      generator: m.isGenerator,
-      expression: false,
-      body: convert(m.body)
-    }
+    id: null,
+    params: convertFormalParameters(m.params),
+    generator: m.isGenerator,
+    expression: false,
+    body: convert(m.body)
   };
 }
 
@@ -802,7 +742,7 @@ function convertExportAllFrom(node) {
   return {
     type: "ExportAllDeclaration",
     source: {
-      type: "Literal",
+      type: "StringLiteral",
       value: node.moduleSpecifier
     }
   };
@@ -813,7 +753,7 @@ function convertExportFrom(node) {
     type: "ExportNamedDeclaration",
     declaration: null,
     source: {
-      type: "Literal",
+      type: "StringLiteral",
       value: node.moduleSpecifier
     },
     specifiers: node.namedExports.map(convert)
@@ -854,7 +794,7 @@ function convertImport(node) {
   return {
     type: "ImportDeclaration",
     source: {
-      type: "Literal",
+      type: "StringLiteral",
       value: node.moduleSpecifier
     },
     specifiers
@@ -875,7 +815,7 @@ function convertImportNamespace(node) {
   return {
     type: "ImportDeclaration",
     source: {
-      type: "Literal",
+      type: "StringLiteral",
       value: node.moduleSpecifier
     },
     specifiers
@@ -886,15 +826,14 @@ function convertImportSpecifier(node) {
   return {
     type: "ImportSpecifier",
     local: convert(node.binding),
-    imported: createIdentifier(node.name)
+    imported: createIdentifier(node.name || node.binding.name)
   };
 }
 
 function convertShorthandProperty(node) {
   return {
-    type: "Property",
+    type: "ObjectProperty",
     shorthand: true,
-    kind: "init",
     method: false,
     computed: false,
     key: createIdentifier(node.name),
