@@ -101,6 +101,7 @@ function convertSetter(node) {
   };
 }
 function convertMethod(node) {
+  if(node.name.value === "constructor") return convertConstructor(node);
   return {
     type: "ObjectMethod",
     key: convert(node.name),
@@ -640,20 +641,23 @@ function convertFormalParameters(ps) {
   return params;
 }
 
-function convertClassElement(node) {
-  let m = node.method;
+function convertConstructor(m) {
   return {
     type: "ClassMethod",
     key: convert(m.name),
     computed: m.name.type === "ComputedPropertyName",
     kind: m.name.value === "constructor" ? "constructor" : "init",
-    static: node.isStatic,
+    static: false,
     id: null,
     params: convertFormalParameters(m.params),
     generator: m.isGenerator,
     expression: false,
     body: convert(m.body)
   };
+}
+
+function convertClassElement(node) {
+  return convert(node.method);
 }
 
 function convertSpreadElement(node) {
