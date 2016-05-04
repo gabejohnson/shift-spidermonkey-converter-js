@@ -165,7 +165,7 @@ function convertLiteralNumericExpression(node) {
 
 function convertLiteralInfinityExpression(node) {
   return {
-    type: "Literal",
+    type: "NumericLiteral",
     value: 1 / 0
   };
 }
