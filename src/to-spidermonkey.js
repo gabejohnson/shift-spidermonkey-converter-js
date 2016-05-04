@@ -254,6 +254,7 @@ function convertConditionalExpression(node) {
 }
 
 function createIdentifier(name) {
+  if(name == null) throw Error("An identifier must have a name!");
   return {
     type: "Identifier",
     name: name
@@ -294,7 +295,7 @@ function convertBlockStatement(node) {
 function convertBreakStatement(node) {
   return {
     type: "BreakStatement",
-    label: createIdentifier(node.label)
+    label: node.label ? createIdentifier(node.label) : null
   };
 }
 
