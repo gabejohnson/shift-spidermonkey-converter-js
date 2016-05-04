@@ -596,7 +596,7 @@ function convertClassExpression(node) {
 
 function convertArrayBinding(node) {
   let elts = node.elements.map(v => {
-    if(v.type === "BindingWithDefault") {
+    if(v && v.type === "BindingWithDefault") {
       return convertBindingWithDefault(v);
     }
     return convert(v);
