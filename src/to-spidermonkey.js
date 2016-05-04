@@ -400,29 +400,19 @@ function convertThrowStatement(node) {
   };
 }
 
-function convertTryCatchStatement(node) {
-  let catchClause = convert(node.catchClause);
+function toTryStatement(convertFinalizer, node) {
   return {
     type: "TryStatement",
     block: convertBlock(node.body),
-    handlers: [catchClause],
-    handler: catchClause,
+    handler: convert(node.catchClause),
     guardedHandlers: [],
-    finalizer: null
+    finalizer: convertFinalizer(node.finalizer)
   };
 }
 
-function convertTryFinallyStatement(node) {
-  let catchClause = convert(node.catchClause);
-  return {
-    type: "TryStatement",
-    block: convertBlock(node.body),
-    handlers: [catchClause],
-    handler: catchClause,
-    guardedHandlers: [],
-    finalizer: convert(node.finalizer)
-  };
-}
+let convertTryCatchStatement = toTryStatement.bind(null, ()=>null);
+
+let convertTryFinallyStatement = toTryStatement.bind(null, convert);
 
 function convertVariableDeclarationStatement(node) {
   return convert(node.declaration);
@@ -460,29 +450,21 @@ function convertCatchClause(node) {
   };
 }
 
-function convertScript(node) {
+function toFile(sourceType, bodyProp, node) {
   return {
     type: "File",
     program: {
       type: "Program",
       directives: node.directives.map(convert),
-      body: node.statements.map(convert),
-      sourceType: "script"
+      body: node[bodyProp].map(convert),
+      sourceType: sourceType
     }
   };
 }
 
-function convertModule(node) {
-  return {
-    type: "File",
-    program: {
-      type: "Program",
-      directives: node.directives.map(convert),
-      body: node.items.map(convert),
-      sourceType: "module"
-    }
-  };
-}
+let convertScript = toFile.bind(null, "script", "statements");
+
+let convertModule = toFile.bind(null, "module", "items");
 
 function toSwitchCase(convertCase, node) {
   return {
